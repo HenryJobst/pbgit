@@ -53,6 +53,7 @@ def rollout(
         print("Update base branch...") if verbose else None
         repo.git.checkout(base_branch)
         repo.git.pull()
+        repo.git.push()
     except GitError:
         print("Update of base branch", base_branch, "failed. Abort rollout.")
         exit(1)
