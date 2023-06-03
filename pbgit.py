@@ -72,9 +72,8 @@ def rollout(
     repo.git.push()
 
     if skip_production:
-        exit(0)
-    else:
         repo.git.checkout(base_branch)
+        exit(0)
 
     try:
         print("Update production branch...") if verbose else None
