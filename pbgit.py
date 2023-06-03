@@ -50,7 +50,7 @@ def rollout(
     remote_repo.fetch()
 
     try:
-        print("Update base branch.") if verbose else None
+        print("Update base branch...") if verbose else None
         repo.git.checkout(base_branch)
         repo.git.pull()
     except GitError:
@@ -58,33 +58,37 @@ def rollout(
         exit(1)
 
     try:
-        print("Update pp branch") if verbose else None
+        print("Update pp branch...") if verbose else None
         repo.git.checkout(pp_branch)
         repo.git.pull()
     except GitError:
         print("Update of pp branch", pp_branch, "failed. Abort rollout.")
         exit(1)
 
-    print("Merge base branch to pp branch.") if verbose else None
+    print("Merge base branch to pp branch...") if verbose else None
     repo.git.merge(base_branch)
-    print("Push pp branch") if verbose else None
+    print("Push pp branch...") if verbose else None
     repo.git.push()
 
     if skip_production:
         exit(0)
+    else:
+        repo.git.checkout(base_branch)
 
     try:
-        print("Update production branch") if verbose else None
+        print("Update production branch...") if verbose else None
         repo.git.checkout(prod_branch)
         repo.git.pull()
     except GitError:
         print("Update of production branch", prod_branch, "failed. Abort rollout.")
         exit(1)
 
-    print("Merge pp branch to production branch.") if verbose else None
+    print("Merge pp branch to production branch...") if verbose else None
     repo.git.merge(pp_branch)
-    print("Push production branch") if verbose else None
+    print("Push production branch...") if verbose else None
     repo.git.push()
+
+    repo.git.checkout(base_branch)
 
 
 if __name__ == '__main__':
