@@ -3,7 +3,7 @@ import git
 import typer
 from git import GitError
 
-CWD = Path.cwd()
+CWD = "."
 
 app = typer.Typer()
 
@@ -45,7 +45,7 @@ def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> None:
         if verbose:
             typer.echo(f"Update {branch} branch...")
         repo.git.checkout(branch)
-        repo.git.pull("--rebase")
+        repo.git.pull(rebase=True)
     except GitError:
         typer.echo(f"Update of {branch} branch failed. Abort rollout.")
         raise typer.Exit(1)
@@ -57,6 +57,7 @@ def validate_branch(repo: git.Repo, branch: str) -> None:
         raise typer.Exit(1)
 
 
+@app.command()
 def rollout(
         working_dir: Path = CWD,
         base_branch: str = "main",
@@ -95,19 +96,6 @@ def rollout(
     repo.git.push()
 
     repo.git.checkout(base_branch)
-
-
-@app.command()
-def main(
-        working_dir: str = typer.Option(default=str(CWD), exists=True, dir_okay=True, file_okay=False),
-        base_branch: str = "main",
-        pp_branch: str = "pre-production",
-        prod_branch: str = "production",
-        remote_repo_name: str = "origin",
-        verbose: bool = False,
-        skip_production: bool = False
-):
-    rollout(Path(working_dir), base_branch, pp_branch, prod_branch, remote_repo_name, verbose, skip_production)
 
 
 if __name__ == '__main__':
