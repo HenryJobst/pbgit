@@ -44,6 +44,7 @@ def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> None:
     try:
         if verbose:
             typer.echo(f"Update {branch} branch...")
+        validate_branch(repo, branch)
         repo.git.checkout(branch)
         repo.git.pull(rebase=True)
     except GitError:
@@ -75,7 +76,6 @@ def rollout(
     has_dirty_changes(repo)
 
     remote_repo = get_remote_repo(repo, remote_repo_name)
-
     remote_repo.fetch()
 
     update_branch(repo, base_branch, verbose)
@@ -90,7 +90,6 @@ def rollout(
     else:
         repo.git.checkout(base_branch)
 
-    validate_branch(repo, prod_branch)
     update_branch(repo, prod_branch, verbose)
     repo.git.merge(pp_branch)
     repo.git.push()

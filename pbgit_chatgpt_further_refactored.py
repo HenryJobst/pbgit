@@ -1,4 +1,5 @@
 from os import getcwd
+
 import git
 import typer
 from git import GitError
@@ -37,12 +38,21 @@ def get_remote_repo(repo: git.Repo, remote_repo_name: str) -> git.Remote | None:
         return None
 
 
-def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> bool:
+def validate_branch(repo: git.Repo, branch: str) -> None:
+    if branch not in repo.heads:
+        typer.echo(f"Branch {branch} does not exist. Abort rollout.")
+        raise typer.Exit(1)
+
+
+def update_branch(repo: git.Repo, branch: str, remote_repo_name: str, verbose: bool = False) -> bool:
     try:
         if verbose:
             typer.echo(f"Update {branch} branch...")
+        validate_branch(repo, branch)
         repo.git.checkout(branch)
-        repo.git.pull()
+        if not repo.heads[branch].tracking_branch():
+            repo.heads[branch].set_tracking_branch(repo.remote(remote_repo_name).refs[branch])
+        repo.git.pull(rebase=True)
         return True
     except GitError:
         typer.echo(f"Update of {branch} branch failed.")
@@ -61,12 +71,26 @@ def merge_branch(repo: git.Repo, source_branch: str, target_branch: str, verbose
         return False
 
 
-def merge_base_to_pp_branch(repo: git.Repo, base_branch: str, pp_branch: str, verbose: bool = False) -> bool:
-    return update_branch(repo, pp_branch, verbose) and merge_branch(repo, base_branch, pp_branch, verbose)
+def merge_base_to_pp_branch(repo: git.Repo,
+                            base_branch: str,
+                            pp_branch: str,
+                            remote_repo_name: str,
+                            verbose: bool = False) -> bool:
+    return update_branch(repo, pp_branch, remote_repo_name, verbose) and merge_branch(repo,
+                                                                                      base_branch,
+                                                                                      pp_branch,
+                                                                                      verbose)
 
 
-def merge_pp_to_prod_branch(repo: git.Repo, pp_branch: str, prod_branch: str, verbose: bool = False) -> bool:
-    return update_branch(repo, prod_branch, verbose) and merge_branch(repo, pp_branch, prod_branch, verbose)
+def merge_pp_to_prod_branch(repo: git.Repo,
+                            pp_branch: str,
+                            prod_branch: str,
+                            remote_repo_name: str,
+                            verbose: bool = False) -> bool:
+    return update_branch(repo, prod_branch, remote_repo_name, verbose) and merge_branch(repo,
+                                                                                        pp_branch,
+                                                                                        prod_branch,
+                                                                                        verbose)
 
 
 def checkout_branch(repo: git.Repo, branch: str, verbose: bool = False) -> bool:
@@ -80,11 +104,12 @@ def checkout_branch(repo: git.Repo, branch: str, verbose: bool = False) -> bool:
         return False
 
 
-def rollout_step(step_name: str, func, *args, **kwargs) -> bool:
+def rollout_step(step_name: str, verbose: bool, func, *args, **kwargs) -> bool:
     try:
         result = func(*args, **kwargs)
         if result:
-            typer.echo(f"{step_name} completed successfully.")
+            if verbose:
+                typer.echo(f"{step_name} completed successfully.")
         else:
             typer.echo(f"{step_name} failed. Abort rollout.")
         return result
@@ -118,22 +143,24 @@ def rollout(
         ("Get remote repository", get_remote_repo, repo, remote_repo_name),
         ("Fetch remote repository", lambda repos, remote_name: repos.remotes[remote_name].fetch(), repo,
          remote_repo_name),
-        ("Update base branch", update_branch, repo, base_branch, verbose),
-        ("Merge base branch to pp branch", merge_base_to_pp_branch, repo, base_branch, pp_branch, verbose)
+        ("Update base branch", update_branch, repo, base_branch, remote_repo_name, verbose),
+        ("Merge base branch to pp branch", merge_base_to_pp_branch, repo, base_branch, pp_branch, remote_repo_name,
+         verbose)
         ]
 
     if not skip_production:
         steps.extend([
-            ("Merge pp branch to production branch", merge_pp_to_prod_branch, repo, pp_branch, prod_branch, verbose)
+            ("Merge pp branch to production branch", merge_pp_to_prod_branch, repo, pp_branch, prod_branch,
+             remote_repo_name, verbose)
             ])
 
     steps.extend([
-            ("Checkout base branch", checkout_branch, repo, base_branch, verbose)
-            ])
+        ("Checkout base branch", checkout_branch, repo, base_branch, verbose)
+        ])
 
     for step_name, func, *args in steps:
-        if not rollout_step(step_name, func, *args):
-            rollout_step("Checkout base branch", checkout_branch, repo, base_branch, verbose)
+        if not rollout_step(step_name, verbose, func, *args):
+            rollout_step("Checkout base branch", verbose, checkout_branch, repo, base_branch, verbose)
             raise typer.Exit(1)
 
 
