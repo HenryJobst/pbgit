@@ -1,14 +1,14 @@
-from os import getcwd
+from pathlib import Path
 import git
 import typer
 from git import GitError
 
-CWD = "."
+CWD = Path.cwd()
 
 app = typer.Typer()
 
 
-def get_repo(working_dir: str) -> git.Repo:
+def get_repo(working_dir: Path) -> git.Repo:
     try:
         repo = git.Repo(working_dir)
         return repo
@@ -30,15 +30,10 @@ def has_dirty_changes(repo: git.Repo) -> None:
 
 
 def get_remote_repo(repo: git.Repo, remote_repo_name: str) -> git.Remote:
-    try:
-        remote_repo = repo.remotes[remote_repo_name]
-        if not remote_repo:
-            typer.echo(f"Remote repo {remote_repo_name} does not exist. Abort rollout.")
-            raise typer.Exit(1)
-        return remote_repo
-    except IndexError:
+    if remote_repo_name not in repo.remotes:
         typer.echo(f"Remote repo {remote_repo_name} does not exist. Abort rollout.")
         raise typer.Exit(1)
+    return repo.remotes[remote_repo_name]
 
 
 def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> None:
@@ -52,9 +47,8 @@ def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> None:
         raise typer.Exit(1)
 
 
-@app.command()
 def rollout(
-        working_dir: str = CWD,
+        working_dir: Path = CWD,
         base_branch: str = "main",
         pp_branch: str = "pre-production",
         prod_branch: str = "production",
@@ -63,7 +57,7 @@ def rollout(
         skip_production: bool = False
 ):
     if working_dir == CWD:
-        working_dir = getcwd()
+        working_dir = Path.cwd()
 
     repo = get_repo(working_dir)
     is_bare_repo(repo)
@@ -90,6 +84,19 @@ def rollout(
     repo.git.push()
 
     repo.git.checkout(base_branch)
+
+
+@app.command()
+def main(
+        working_dir: str = typer.Option(default=str(CWD), exists=True, dir_okay=True, file_okay=False),
+        base_branch: str = "main",
+        pp_branch: str = "pre-production",
+        prod_branch: str = "production",
+        remote_repo_name: str = "origin",
+        verbose: bool = False,
+        skip_production: bool = False
+):
+    rollout(Path(working_dir), base_branch, pp_branch, prod_branch, remote_repo_name, verbose, skip_production)
 
 
 if __name__ == '__main__':
