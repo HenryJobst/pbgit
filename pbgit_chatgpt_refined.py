@@ -9,6 +9,10 @@ app = typer.Typer()
 
 
 def get_repo(working_dir: Path) -> git.Repo:
+    if not working_dir.exists():
+        typer.echo(f"Working directory {working_dir} does not exist. Abort rollout.")
+        raise typer.Exit(1)
+
     try:
         repo = git.Repo(working_dir)
         return repo
@@ -41,9 +45,15 @@ def update_branch(repo: git.Repo, branch: str, verbose: bool = False) -> None:
         if verbose:
             typer.echo(f"Update {branch} branch...")
         repo.git.checkout(branch)
-        repo.git.pull()
+        repo.git.pull("--rebase")
     except GitError:
         typer.echo(f"Update of {branch} branch failed. Abort rollout.")
+        raise typer.Exit(1)
+
+
+def validate_branch(repo: git.Repo, branch: str) -> None:
+    if branch not in repo.heads:
+        typer.echo(f"Branch {branch} does not exist. Abort rollout.")
         raise typer.Exit(1)
 
 
@@ -79,6 +89,7 @@ def rollout(
     else:
         repo.git.checkout(base_branch)
 
+    validate_branch(repo, prod_branch)
     update_branch(repo, prod_branch, verbose)
     repo.git.merge(pp_branch)
     repo.git.push()
