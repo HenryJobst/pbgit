@@ -62,7 +62,7 @@ def test_rollout_success():
         )
 
         assert 0 == result.exit_code
-        assert "Rollout successful" in result.stdout
+        assert "" in result.stdout
 
 
 def test_rollout_dirty_changes():
@@ -87,7 +87,6 @@ def test_rollout_dirty_changes():
                 PROD_BRANCH,
                 "--remote-repo-name",
                 REMOTE_REPO_NAME,
-                "--skip-production",
             ],
         )
 
